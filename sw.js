@@ -1,6 +1,6 @@
 // sw.js (Service Worker 파일)
 
-const CACHE_NAME = 'pass-pwa-cache-v2'; // 캐시 버전 업데이트 (v1 -> v2)
+const CACHE_NAME = 'pass-pwa-cache-v3'; // 캐시 버전을 V3로 업데이트
 // 캐시할 파일 목록을 상대 경로('./')로 수정합니다.
 const urlsToCache = [
     './', // index.html을 의미합니다.
@@ -11,14 +11,14 @@ const urlsToCache = [
 
 // Service Worker 설치 및 필수 파일 캐싱
 self.addEventListener('install', event => {
-  console.log('[Service Worker] 설치 시작...');
+  console.log('[Service Worker] V3 설치 시작...');
   // 새로운 캐시 버전을 열어 파일들을 캐시에 추가합니다.
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('[Service Worker] 캐시에 파일 추가 중:', urlsToCache);
+        console.log('[Service Worker] V3 캐시에 파일 추가 중:', urlsToCache);
         return cache.addAll(urlsToCache).catch(err => {
-            console.error('[Service Worker] 캐싱 실패. 경로를 확인하세요:', err);
+            console.error('[Service Worker] V3 캐싱 실패. 경로를 확인하세요:', err);
         });
       })
   );
