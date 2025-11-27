@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 앱 이름에 맞게 title 수정 --><title>PASS 모바일 신분증</title>
+    
+    <!-- PWA Manifest 파일 연결 --><link rel="manifest" href="manifest.json">
+    
+    <!-- Nanum Barun Gothic 폰트 CDN 로드 (볼드 700 포함) --><link href="https://fonts.googleapis.com/css2?family=Nanum+Barun+Gothic:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN 로드 --><script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 'Nanum Barun Gothic' 볼드 폰트 사용 (기본 굵기 700) */
+        body { 
+            font-family: 'Nanum Barun Gothic', sans-serif; 
+            background-color: #000000;
+            font-weight: 700; /* 기본 폰트 굵기를 Bold (700)로 설정 */
+        }
+        
+        /* 모바일 환경 시뮬레이션을 위한 중앙 컨테이너 */
+        #app-container {
+            max-width: 420px; /* 일반적인 스마트폰 너비 제한 */
+            min-height: 100vh;
+            margin: 0 auto;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Kivy 스타일 버튼 및 스위치 */
+        .kivy-button {
+            transition: all 0.15s ease-in-out;
+        }
+        .kivy-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .kivy-button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        /* 롤링 메시지 애니메이션 (Marquee Banner) */
+        @keyframes marquee-scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .marquee-content {
+            white-space: nowrap;
+            display: inline-block;
+            animation: marquee-scroll 15s linear infinite;
+        }
+
+        /* iOS 토글 스위치 스타일 */
+        .ios-toggle-container {
+            width: 70px;
+            height: 35px;
+            position: relative;
+            background-color: #aaa;
+            border-radius: 17.5px;
+            transition: background-color 0.2s;
+        }
+        .ios-toggle-container.active {
+            background-color: #000000; /* Kivy의 #000000 색상 */
+        }
+        .ios-toggle-knob {
+            position: absolute;
+            top: 2.5px; /* 패딩 2.5px */
+            left: 2.5px;
+            width: 30px;
+            height: 30px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .ios-toggle-container.active .ios-toggle-knob {
+            transform: translateX(35px); /* 70px - 30px(knob) - 2.5px*2(padding) = 35px 이동 */
+        }
+    </style>
+    <script>
+        // --- [개인 정보 상수] (Kivy 코드와 일치) ---
+        const NAME_TEXT = '김민결';
+        const DOB_TEXT = '06.01.19'; 
+        const JUMIN_MASKED = "060119-3******";
+        const JUMIN_UNMASKED_TEXT = "060119-3358511";
+        const ADDRESS_PREVIEW = '성남시 분당구';
+        const ADDRESS_MASKED = "성남시 분당구 ***********";
+        const ADDRESS_UNMASKED = "성남시 분당구 불곡남로\n4번길 9 3층 (정자동)";
+        const ISSUE_DATE_TEXT = "2025.10.15";
+        const ISSUE_OFFICE_TEXT = "분당구청장";
+        
+        // --- [이미지 URL] ---
+        const PROFILE_PHOTO_URL = "profile_photo.jpg"; 
+        // 주 QR 코드 경로만 유지합니다.
+        const QR_CODE_URL_MAIN = "qr_main.png";
+        // ------------------------------------------
+
+        let isInfoMasked = true; // 정보 마스킹 상태
+        let timerInterval;
+
+        // Kivy의 Alert 대체 (커스텀 메시지 박스)
+        function alertMessage(message, type) {
+            const container = document.getElementById('message-container');
+            const color = type === 'error' ? 'bg-red-500' : type === 'info' ? 'bg-blue-500' : 'bg-green-500';
+            const html = `
+                <div class="${color} text-white p-3 rounded-lg shadow-xl mb-4 text-center transform transition duration-500 ease-in-out" role="alert">
+                    ${message}
+                </div>
+            `;
+            container.innerHTML = html;
+            
+            // 3초 후 메시지 제거
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 3000);
+        }
+
+        // 상세 정보 토글 (Kivy on_details_toggled 함수 모방)
+        function onDetailsToggled(activate) {
+            isInfoMasked = !activate;
+            const juminEl = document.getElementById('jumin-detail-label');
+            const addressEl = document.getElementById('address-detail-label');
+
+            if (activate) {
+                juminEl.textContent = JUMIN_UNMASKED_TEXT;
+                // Kivy의 \n을 <br>로 변환하여 주소의 줄바꿈을 처리
+                addressEl.innerHTML = ADDRESS_UNMASKED.replace(/\n/g, '<br>'); 
+            } else {
+                juminEl.textContent = JUMIN_MASKED;
+                addressEl.textContent = ADDRESS_MASKED;
+            }
+        }
+        
+        // iOS 토글 버튼 클릭 이벤트
+        function handleToggleClick() {
+            const toggle = document.getElementById('info-toggle');
+            const isActive = toggle.classList.toggle('active');
+            onDetailsToggled(isActive);
+        }
+        
+        // Kivy의 toggle_view 로직을 웹으로 구현
+        function toggleMainDetailView(button) {
+            const mainQrView = document.getElementById('main-qr-view');
+            const detailsView = document.getElementById('details-view');
+            
+            if (mainQrView.classList.contains('hidden')) {
+                // 현재 상세 보기 -> QR 정보 표시로 전환
+                mainQrView.classList.remove('hidden');
+                detailsView.classList.add('hidden');
+                button.textContent = 'QR정보 표시';
+                // 화면 전환 시 마스킹 상태로 초기화 (선택 사항)
+                onDetailsToggled(false);
+                document.getElementById('info-toggle').classList.remove('active');
+            } else {
+                // 현재 QR 정보 표시 -> 상세 보기로 전환
+                mainQrView.classList.add('hidden');
+                detailsView.classList.remove('hidden');
+                button.textContent = '상세보기';
+            }
+        }
+        
+        // Kivy의 타이머 로직을 웹으로 구현
+        let timerSeconds = 60;
+
+        function updateTimer() {
+            timerSeconds -= 1;
+            
+            const progressBarEl = document.getElementById('progress-bar-in-card');
+            const timerLabelEl = document.getElementById('timer-label-in-card');
+            
+            // 요소가 없으면 타이머 중지
+            if (!progressBarEl || !timerLabelEl) {
+                clearInterval(timerInterval);
+                return;
+            }
+
+            const progressFillEl = progressBarEl.querySelector('div');
+
+            if (timerSeconds < 0) {
+                timerSeconds = 60; // 타이머 리셋
+            }
+            
+            const percentage = (timerSeconds / 60) * 100;
+
+            timerLabelEl.textContent = `남은시간 ${timerSeconds}초`;
+            progressFillEl.style.width = `${percentage}%`;
+        }
+
+
+        // 초기화 함수
+        window.onload = () => {
+            // 이미지 소스 설정 (실제 캐시될 URL)
+            document.getElementById('profile-photo').src = PROFILE_PHOTO_URL;
+            // 주 QR 코드 이미지 설정
+            document.getElementById('qr-code-image-main').src = QR_CODE_URL_MAIN;
+            
+            // 신분증 정보 설정
+            document.getElementById('card-name-label').textContent = NAME_TEXT;
+            document.getElementById('card-dob-label').textContent = DOB_TEXT;
+            document.getElementById('card-address-label').textContent = ADDRESS_PREVIEW;
+            document.getElementById('name-detail-label').textContent = NAME_TEXT;
+            
+            // 발급일/발급처 정보 설정 (상세 뷰만 사용)
+            document.getElementById('issue-date-value-details').textContent = ISSUE_DATE_TEXT;
+            document.getElementById('issue-office-value-details').textContent = ISSUE_OFFICE_TEXT;
+            
+            // 토글 이벤트 리스너
+            document.getElementById('info-toggle').addEventListener('click', handleToggleClick);
+            
+            // 초기 마스킹 상태 설정
+            onDetailsToggled(false); 
+            
+            // 타이머 시작 (1초마다 업데이트)
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            // Service Worker 등록
+            if ('serviceWorker' in navigator) {
+                // 경로 오류 해결: 루트 상대 경로(/)를 사용하여 다시 시도합니다.
+                navigator.serviceWorker.register('/service-worker.js')
+                .then(registration => console.log('Service Worker Registered', registration))
+                .catch(error => console.error('Service Worker Registration failed:', error));
+            }
+        };
+    </script>
+</head>
+<body>
+    <!-- 전체 모바일 뷰 컨테이너 --><div id="app-container">
+        
+        <!-- 상단 헤더 --><header class="bg-white text-black p-4 shadow-lg sticky top-0">
+            <!-- Kivy MainLayout의 헤더 구조를 모방 --><div class="px-2 pt-1">
+                <h1 id="header-title" class="text-xl font-bold text-gray-800 transition-opacity duration-300 text-center">모바일 신분증</h1>
+                <p id="header-subtitle" class="text-md font-medium text-gray-900 underline">주민등록증</p>
+            </div>
+        </header>
+
+        <!-- 롤링 메시지 배너 (Marquee Banner) --><div id="marquee-banner" class="bg-gray-700 text-white overflow-hidden h-[35px] flex items-center">
+            <div class="marquee-content text-sm font-light whitespace-nowrap px-4">
+                보안정책에 따라 화면을 캡처할 수 없습니다. 위변조 방지중입니다. &nbsp;&nbsp;&nbsp; 보안정책에 따라 화면을 캡처할 수 없습니다. 위변조 방지중입니다. &nbsp;&nbsp;&nbsp;
+            </div>
+        </div>
+
+        <!-- 메시지/알림 영역 --><div id="message-container" class="px-4 pt-4">
+            <!-- Alert 메시지가 여기에 표시됩니다. --></div>
+
+        <!-- 메인 콘텐츠 영역 (ID Screen) --><main id="id-screen" class="flex-grow p-4 overflow-y-auto flex justify-center items-center">
+            <!-- ID Card Container --><div class="relative bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm" style="height: 500px;">
+                
+                <!-- 1. 인물 사진 영역 (상단) --><div class="absolute" style="left: 50%; top: 20px; transform: translateX(-50%);">
+                    <div class="w-[240px] h-[240px] bg-gray-100 rounded-xl flex items-center justify-center border-2 border-gray-200">
+                        
+                        <!-- [사진 삽입 위치] --><img 
+                            id="profile-photo"
+                            src="" 
+                            alt="프로필 사진" 
+                            class="w-[220px] h-[220px] rounded-xl object-cover"
+                            onerror="this.onerror=null; this.src='https://placehold.co/220x220/374151/ffffff?text=Image+Load+Error';"
+                        >
+                    </div>
+                </div>
+                
+                <!-- 2. 메인 정보/상세 교체 영역 --><div class="absolute w-[85%] left-1/2 -translate-x-1/2" style="top: 280px;">
+                    
+                    <!-- 2-A. QR/기본 정보 뷰 (Default View) --><div id="main-qr-view" class="space-y-4">
+                        <div class="flex justify-between items-start">
+                            <!-- 텍스트 정보 영역 (이름, 생년월일, 주소) --><div class="w-3/5 space-y-1 pr-4">
+                                <!-- 이름 --><p id="card-name-label" class="text-2xl font-bold text-gray-900"></p>
+                                <!-- 생년월일 --><p id="card-dob-label" class="text-lg text-gray-600"></p>
+                                <!-- 주소 --><p id="card-address-label" class="text-lg text-gray-600"></p>
+                            </div>
+                            <!-- 주 QR 코드 영역 --><div class="w-2/5 flex justify-end">
+                                <!-- 주 QR 코드 Placeholder (ID: qr-code-image-main) --><img 
+                                    id="qr-code-image-main"
+                                    src="" 
+                                    alt="주 QR 코드" 
+                                    class="w-24 h-24 rounded-lg"
+                                    onerror="this.onerror=null; this.src='https://placehold.co/100x100/5B39A0/ffffff?text=Main+QR+Error';"
+                                >
+                            </div>
+                        </div>
+
+                        <!-- 프로그레스 바 및 타이머 --><div class="mt-4">
+                            <div id="progress-bar-in-card" class="h-1 bg-indigo-200 rounded-full">
+                                <div class="h-full bg-indigo-600 rounded-full" style="width: 100%;"></div>
+                            </div>
+                            <p id="timer-label-in-card" class="text-sm text-gray-600 mt-1">남은시간 60초</p>
+                        </div>
+                        
+                    </div>
+                    
+                    <!-- 2-B. 상세 정보 뷰 (Details View) --><div id="details-view" class="hidden space-y-2">
+                        
+                        <!-- 1. 이름 (Name) --><p id="name-detail-label" class="text-2xl font-bold text-gray-900"></p>
+                        
+                        <!-- 2. 주민/주소 (Jumin/Address) + 토글 (Toggle) --><div class="flex justify-between items-start py-0">
+                            <div class="flex-grow space-y-1">
+                                <!-- Jumin/DOB (생년월일 포함) --><p id="jumin-detail-label" class="text-lg font-medium text-gray-700"></p>
+                                <!-- Address (주소) --><p id="address-detail-label" class="text-lg text-gray-600 whitespace-pre-line"></p>
+                            </div>
+                            <!-- iOS 토글 (Kivy IOSToggle 모방) --><div id="info-toggle" class="ios-toggle-container flex-shrink-0 cursor-pointer">
+                                <div class="ios-toggle-knob"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 3. 발급 정보 (Issue Date/Office) - 상세 뷰에는 유지, 굵기 font-normal 유지 --><div class="space-y-2 mt-4">
+                            <div class="flex justify-between text-sm text-gray-600">
+                                <span class="font-normal">발급일</span>
+                                <span id="issue-date-value-details" class="font-normal text-gray-800"></span>
+                            </div>
+                            <div class="flex justify-between text-sm text-gray-600">
+                                <span class="font-normal">발급처</span>
+                                <span id="issue-office-value-details" class="font-normal text-gray-800"></span>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+
+        </main>
+        
+        <!-- 하단 버튼 영역 (Kivy Bottom Button 모방) --><footer class="p-4 border-t border-gray-100 flex-shrink-0">
+            <button id="toggle-view-btn" onclick="toggleMainDetailView(this)" class="kivy-button w-full bg-black hover:bg-gray-800 text-white p-3 rounded-xl font-bold shadow-lg">
+                상세보기
+            </button>
+        </footer>
+    </div>
+</body>
+</html>
