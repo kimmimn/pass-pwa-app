@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 앱 이름에 맞게 title 수정 --><title>PASS 모바일 신분증</title>
+    <!-- 앱 이름에 맞게 title 수정 --><title>모바일 신분증</title>
     
     <!-- PWA Manifest 파일 연결 (JS에서 동적으로 생성하여 연결됨) -->
     
@@ -14,7 +14,8 @@
         body { 
             font-family: 'Nanum Barun Gothic', sans-serif; 
             background-color: #00000;
-            font-weight: 700; /* 기본 폰트 굵기를 Bold (700)로 설정 */
+            /* 요청에 따라 모든 텍스트를 Bold (700)로 설정 */
+            font-weight: 700; 
         }
         
         /* 모바일 환경 시뮬레이션을 위한 중앙 컨테이너 */
@@ -192,8 +193,8 @@
         
         // 1. Manifest JSON 데이터 (PWA 설치 메타데이터)
         const manifestSource = JSON.stringify({
-            "name": "PASS 모바일 신분증",
-            "short_name": "PASS ID",
+            "name": "모바일 신분증",
+            "short_name": "모바일 ID",
             "description": "본인 인증 및 모바일 신분증 서비스",
             "start_url": "./",
             "display": "standalone", // 앱처럼 보이게 설정
@@ -201,12 +202,12 @@
             "theme_color": "#000000",
             "icons": [
                 {
-                    "src": "https://placehold.co/192x192/000000/ffffff?text=PASS",
+                    "src": "https://placehold.co/192x192/000000/ffffff?text=ID",
                     "sizes": "192x192",
                     "type": "image/png"
                 },
                 {
-                    "src": "https://placehold.co/512x512/000000/ffffff?text=PASS",
+                    "src": "https://placehold.co/512x512/000000/ffffff?text=ID",
                     "sizes": "512x512",
                     "type": "image/png"
                 }
@@ -215,7 +216,7 @@
 
         // 2. Service Worker 자바스크립트 소스 코드 (캐싱 및 오프라인 지원)
         const serviceWorkerSource = `
-            const CACHE_NAME = 'pass-id-v1';
+            const CACHE_NAME = 'mobile-id-v1';
             const urlsToCache = [
               './', // 현재 페이지
               'https://cdn.tailwindcss.com',
@@ -321,7 +322,7 @@
         
         <!-- 상단 헤더 --><header class="bg-white text-black p-4 shadow-lg sticky top-0">
             <!-- Kivy MainLayout의 헤더 구조를 모방 --><div class="px-2 pt-1">
-                <h1 id="header-title" class="text-xl font-bold text-gray-800 transition-opacity duration-300 text-center">PASS</h1>
+                <!-- PASS를 '모바일 신분증'으로 수정 --><h1 id="header-title" class="text-xl font-bold text-gray-800 transition-opacity duration-300 text-center">모바일 신분증</h1>
                 <p id="header-subtitle" class="text-md font-medium text-gray-900 underline">주민등록증</p>
             </div>
         </header>
